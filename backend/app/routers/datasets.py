@@ -29,7 +29,7 @@ async def upload_dataset(
     preview = [{"attribute": a, "metric": m} for a, m in zip(attributes[:5], metrics[:5])]
     embeddings = []
     for attr in attributes:
-        resp = openai.Embedding.create(input=[attr], model="text-embedding-ada-002")
+        resp = openai.embeddings.create(model="text-embedding-ada-002", input=[attr])
         embeddings.append(resp.data[0].embedding)
     embeddings = np.array(embeddings)
     ds_id = str(uuid.uuid4())
