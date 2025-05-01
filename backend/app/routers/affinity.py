@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
-from ..schemas import AffinityRequest, AffinityMatrix
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 from ..models import DATASETS
-from ..embeddings import get_embedding
-from ..vector_db import upsert_vectors, query_vector
+from ..schemas import AffinityRequest, AffinityMatrix
 
 router = APIRouter(prefix="/affinity", tags=["affinity"])
 
@@ -15,21 +15,22 @@ async def generate_affinity(req: AffinityRequest):
     if not ds1 or not ds2:
         raise HTTPException(404, "Dataset not found")
 
-    items = []
-    attributes = []
-    for ds_id, ds in [(req.dataset_ids[0], ds1), (req.dataset_ids[1], ds2)]:
-        for row in ds["rows"]:
-            vec = get_embedding(row["attribute"])
-            items.append({"id": f"{ds_id}|{row['attribute']}", "values": vec})
-            attributes.append(row["attribute"])
+    emb1 = ds1['embeddings']
+    emb2 = ds2['embeddings']
+    matrix = cosine_similarity(emb1, emb2).tolist()
+    return {"matrix": matrix, "attributes1": ds1['attributes'], "attributes2": ds2['attributes']}
 
-    upsert_vectors(items)
+# app/main.py
+from fastapi import FastAPI
+from .routers import datasets, affinity
 
-    matrix = []
-    for item in items:
-        matches = query_vector(item["values"], top_k=len(items))
-        score_map = {m.id: m.score for m in matches}
-        scores = [score_map.get(it["id"], 0.0) for it in items]
-        matrix.append(scores)
+app = FastAPI()
+app.include_router(datasets.router)
+app.include_router(affinity.router)
 
-    return {"matrix": matrix, "attributes": attributes}
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+# .env.example
+OPENAI_API_KEY=
