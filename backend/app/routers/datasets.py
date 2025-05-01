@@ -1,8 +1,12 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 import csv, io, uuid
-from ..schemas import DatasetItem
+import numpy as np
+import openai
+from ..settings import settings
 from ..models import DATASETS
+from ..schemas import DatasetItem
 
+openai.api_key = settings.openai_api_key
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
 @router.post("/upload", response_model=DatasetItem)
@@ -15,16 +19,23 @@ async def upload_dataset(
     name: str = Form(...)
 ):
     content = await file.read()
-    text = content.decode('utf-8')
-    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
-    rows = list(reader)
+    rows = list(csv.reader(io.StringIO(content.decode('utf-8')), delimiter=delimiter))
     if header_row < 1 or header_row > len(rows):
-        raise HTTPException(status_code=400, detail="Invalid header row")
-    preview = [{"attribute": r[attribute_col], "metric": r[metric_col]} for r in rows[header_row:header_row+5]]
+        raise HTTPException(400, "Invalid header row")
+    data_rows = rows[header_row:]
+    attributes = [r[attribute_col] for r in data_rows]
+    metrics = [r[metric_col] for r in data_rows]
+    preview = [{"attribute": a, "metric": m} for a, m in zip(attributes[:5], metrics[:5])]
+    embeddings = []
+    for attr in attributes:
+        resp = openai.Embedding.create(input=[attr], model="text-embedding-ada-002")
+        embeddings.append(resp.data[0].embedding)
+    embeddings = np.array(embeddings)
     ds_id = str(uuid.uuid4())
-    DATASETS[ds_id] = {"name": name, "rows": [{"attribute": r[attribute_col], "metric": r[metric_col]} for r in rows[header_row:]]}
+    DATASETS[ds_id] = {"name": name, "attributes": attributes, "metrics": metrics, "embeddings": embeddings}
     return {"id": ds_id, "name": name, "preview": preview}
 
 @router.get("/", response_model=List[DatasetItem])
 def list_datasets():
-    return [{"id": ds_id, "name": ds["name"], "preview": ds["rows"][:5]} for ds_id, ds in DATASETS.items()]
+    return [{"id": ds_id, "name": ds["name"], "preview": [{"attribute": a, "metric": m} for a, m in zip(ds["attributes"][:5], ds["metrics"][:5])]} for ds_id, ds in DATASETS.items()]
+
