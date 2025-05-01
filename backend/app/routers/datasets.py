@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 import csv, io, uuid
 import numpy as np
 import openai
+from typing import List
 from ..settings import settings
 from ..models import DATASETS
 from ..schemas import DatasetItem
