@@ -11,4 +11,5 @@ class AffinityRequest(BaseModel):
 
 class AffinityMatrix(BaseModel):
     matrix: List[List[float]]
-    attributes: List[str]
+    attributes1: List[str]
+    attributes2: List[str]
