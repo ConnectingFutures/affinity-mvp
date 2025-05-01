@@ -86,6 +86,9 @@ export default function ParsingForm() {
           />
         </div>
       </div>
-      <button type="submit" className="btn btn-primary w-full">Upload & Parse</button>
+      <button type="submit" className="btn btn-primary w-full">
+        Upload & Parse
+      </button>
     </form>
+  );
 }
